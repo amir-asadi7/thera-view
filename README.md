@@ -48,15 +48,15 @@ Uncomment or add the following lines:
    X11Forwarding yes
    X11DisplayOffset 10
    X11UseLocalhost yes
-
    ```
+
 Restart the SSH service
    ```bash
    sudo systemctl restart ssh
    ```
 
 
-On the Ubuntu (client) side
+**On the Ubuntu (client) side**
 
 Install utilities
    ```bash
@@ -75,21 +75,24 @@ Add or confirm this line:
 
 Connect to the Raspberry Pi using X forwarding:
 ```bash
-ssh -X rpicam@rpicam.local
+   ssh -X rpicam@rpicam.local
 ```
 
 ## Rpi setup
 
-    ```bash
+   ```bash
    sudo apt update && sudo apt upgrade -y
    sudo apt-get install git python3 python3-venv python3-pip -y #current version of python is 3.13.5 ()
-    ```
+   sudo apt install libgl1
+
+   ```
 
 ## Virtual env setup and requirements
 
-    ```bash
-    git clone #link
-    cd thera-view
-    python3 -m venv venv     
-    source venv/bin/activate
-    pip install -r requirements.txt
+   ```bash
+   git clone #link
+   cd thera-view
+   python3 -m venv venv     
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
