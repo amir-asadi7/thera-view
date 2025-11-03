@@ -34,16 +34,62 @@ Each setup requires:
 
 Additional configuration details will be added later.
 
----
 
-## 1. Venv setup and installation
+## Development Mode: X11 Forwarding Setup
+
+To develop or test GUI applications remotely, set up **X11 forwarding** between your Raspberry Pi and Ubuntu system.
+
+1. Edit the SSH daemon configuration:  
+   ```bash
+   sudo nano /etc/ssh/sshd_config
+   ```
+Uncomment or add the following lines:
+   ```bash
+   X11Forwarding yes
+   X11DisplayOffset 10
+   X11UseLocalhost yes
+
+   ```
+Restart the SSH service
+   ```bash
+   sudo systemctl restart ssh
+   ```
+
+
+On the Ubuntu (client) side
+
+Install utilities
+   ```bash
+   sudo apt update
+   sudo apt install xorg openssh-client 
+   ```
+
+edit the SSH configuration to allow X forwarding:
+   ```bash
+   sudo nano /etc/ssh/ssh_config
+   ```
+Add or confirm this line:
+   ```bash
+   ForwardX11 yes
+   ```
+
+Connect to the Raspberry Pi using X forwarding:
+```bash
+ssh -X rpicam@rpicam.local
+```
+
+## Rpi setup
+
+    ```bash
+   sudo apt update && sudo apt upgrade -y
+   sudo apt-get install git python3 python3-venv python3-pip -y #current version of python is 3.13.5 ()
+    ```
+
+## Virtual env setup and requirements
 
     ```bash
     git clone #link
     cd thera-view
-    python3 -m venv venv     # you may need to run this:    sudo apt install python3.10-venv  ##to be cheked on Rpi
+    python3 -m venv venv     
     source venv/bin/activate
     pip install -r requirements.txt
-    ```
-
-
