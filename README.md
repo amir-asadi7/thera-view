@@ -31,3 +31,31 @@ and writes a CSV table of metrics (real frame rate, bitrate, file size, etc.).
 python scripts/analyze_recordings.py recordings/<timestamp>
 ```
 
+## Live viewer and recorder
+
+The `app/main.py` script provides a simple graphical application for previewing
+and recording a webcam feed on Linux desktop environments (including Ubuntu and
+Raspberry Pi OS). It displays the live video stream, reports the current FPS and
+resolution, and lets you start/stop recordings with on-screen controls. Each
+recorded MP4 embeds the current date and time in the video frames. Additional
+controls let you open the recordings directory or adjust capture settings such
+as the camera index, target resolution, FPS, and output location.
+
+### Running the app
+
+1. Install the dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Launch the GUI:
+
+   ```bash
+   python app/main.py
+   ```
+
+Recordings are saved in the directory configured via the **Config** button
+(`recordings/` by default). Use the **Open Recordings Folder** button to view
+finished clips in your system's file manager.
+
