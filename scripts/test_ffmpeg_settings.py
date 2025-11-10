@@ -1,37 +1,52 @@
 import av
 import time
 import statistics
+import os
 
-# Device and core test settings
+# ---------- CONFIGURATION ----------
 CAMERA_DEVICE = "/dev/video0"
-TEST_SECONDS = 5
 WIDTH, HEIGHT, TARGET_FPS = 1920, 1080, 30
+TEST_SECONDS = 20
+OUTPUT_DIR = "ffmpeg_tests"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Define encoders and settings to test
-ENCODER_TESTS = [
-    # ---------- Software encoders ----------
-    ("libx264", {"preset": "ultrafast", "crf": "30"}),
-    ("libx264", {"preset": "veryfast", "crf": "26"}),
-    ("libx264", {"preset": "medium", "crf": "23"}),
-    ("libx265", {"preset": "ultrafast", "crf": "30"}),  # HEVC (may be slower)
-    ("mpeg4", {"qscale": "5"}),  # Legacy fallback
-    ("libvpx", {"cpu-used": "8", "deadline": "realtime", "b": "2M"}),  # VP8
+# ---------- FUNCTIONS ----------
 
-    # ---------- Hardware encoders ----------
-    ("h264_v4l2m2m", {"bitrate": "4000000"}),  # Raspberry Pi 4 hardware H.264
-    ("h264_omx", {"bitrate": "4000000"}),      # OMX hardware encoder (older Pi)
-    ("h264_mmal", {"bitrate": "4000000"}),     # MMAL encoder (Pi-specific legacy)
-    ("hevc_v4l2m2m", {"bitrate": "4000000"}),  # Hardware HEVC (newer kernels)
-]
+def get_video_encoders():
+    """Return a list of available video encoder names."""
+    encoders = []
+    for name in av.codecs_available:
+        try:
+            c = av.codec.Codec(name, "w")
+            if c.type == "video":
+                encoders.append(name)
+        except Exception:
+            pass
+    return encoders
+
+
+def get_supported_pixfmts(encoder_name):
+    """Return pixel formats supported by an encoder."""
+    try:
+        codec = av.codec.Codec(encoder_name, "w")
+        return [fmt.name for fmt in codec.video_formats]
+    except Exception:
+        return []
+
 
 def open_camera():
+    """Open camera device for decoding."""
     container = av.open(CAMERA_DEVICE)
     stream = container.streams.video[0]
     stream.thread_type = "AUTO"
     return container, stream
 
-def test_encoder(encoder_name, options):
-    print(f"\n=== Testing {encoder_name} with options {options} ===")
+
+def test_encoder(encoder_name, pix_fmt):
+    """Record a short video using a given encoder and pixel format."""
+    filename = f"{OUTPUT_DIR}/test_{encoder_name}_{pix_fmt}.mp4"
+    print(f"\n=== Testing {encoder_name} ({pix_fmt}) ===")
+
     try:
         container, stream_in = open_camera()
     except Exception as e:
@@ -39,11 +54,11 @@ def test_encoder(encoder_name, options):
         return None
 
     try:
-        output = av.open("test_output.mp4", mode="w")
-        stream_out = output.add_stream(encoder_name, rate=TARGET_FPS, options=options)
+        output = av.open(filename, mode="w")
+        stream_out = output.add_stream(encoder_name, rate=TARGET_FPS)
         stream_out.width = WIDTH
         stream_out.height = HEIGHT
-        stream_out.pix_fmt = "yuv420p"
+        stream_out.pix_fmt = pix_fmt
 
         frame_times = []
         frame_count = 0
@@ -54,7 +69,7 @@ def test_encoder(encoder_name, options):
             frame_times.append(now)
             frame_count += 1
 
-            frame_enc = frame.reformat(width=WIDTH, height=HEIGHT, format="yuv420p")
+            frame_enc = frame.reformat(width=WIDTH, height=HEIGHT, format=pix_fmt)
             packets = stream_out.encode(frame_enc)
             for packet in packets:
                 output.mux(packet)
@@ -76,10 +91,6 @@ def test_encoder(encoder_name, options):
         intervals = [frame_times[i+1] - frame_times[i] for i in range(len(frame_times)-1)]
         avg_fps = 1.0 / statistics.mean(intervals)
         print(f"Captured {frame_count} frames at ~{avg_fps:.2f} FPS")
-
-        meets_target = avg_fps >= TARGET_FPS * 0.95
-        print("✓ PASS" if meets_target else "✗ FAIL")
-
         return avg_fps
 
     except av.error.FFmpegError as e:
@@ -89,14 +100,28 @@ def test_encoder(encoder_name, options):
         print(f"General error: {e}")
         return None
 
+
+# ---------- MAIN ----------
 if __name__ == "__main__":
-    print("Starting FFmpeg encoder performance test for 1080p@30fps\n")
-    results = {}
-    for name, opts in ENCODER_TESTS:
-        fps = test_encoder(name, opts)
-        if fps:
-            results[f"{name} {opts}"] = fps
+    print(f"Scanning available encoders and pixel formats on this system...")
+    encoders = get_video_encoders()
+    print(f"Found {len(encoders)} video encoders.\n")
+
+    results = []
+
+    for enc in encoders:
+        pixfmts = get_supported_pixfmts(enc)
+        if not pixfmts:
+            continue
+        print(f"{enc}: {', '.join(pixfmts)}")
+
+        for pix in pixfmts:
+            fps = test_encoder(enc, pix)
+            if fps:
+                results.append((enc, pix, fps))
 
     print("\n=== Summary ===")
-    for name, fps in sorted(results.items(), key=lambda x: x[1], reverse=True):
-        print(f"{name:60s} → {fps:.2f} FPS")
+    for enc, pix, fps in sorted(results, key=lambda x: x[2], reverse=True):
+        print(f"{enc:20s} {pix:10s} → {fps:.2f} FPS")
+
+    print(f"\nRecordings saved in: {os.path.abspath(OUTPUT_DIR)}")
